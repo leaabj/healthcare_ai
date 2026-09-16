@@ -16,8 +16,7 @@ analysis, not a deployed tool or evidence that follow-up prevents readmissions.
 
 | File / directory | Purpose |
 |---|---|
-| `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–5, plots, clinical interpretations, and group handoff |
-| `Step_1_Clinical_Problem_Framing.md` | Detailed framing and explicitly hypothetical policy targets |
+| `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–5, plots, clinical framing, and group handoff |
 | `environment.yml` | Pinned direct dependencies for the first-half scientific environment |
 | `requirements-first-half.lock.txt` | Full package versions from the executed Python 3.10 environment |
 | `Data/` | Downloaded public CSVs; generated locally and ignored by Git |
