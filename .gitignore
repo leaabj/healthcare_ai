@@ -3,5 +3,7 @@
 __pycache__/
 *.pyc
 .DS_Store
-Data/
+Data/*
+!Data/diabetic_data.csv
+!Data/IDS_mapping.csv
 artifacts/

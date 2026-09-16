@@ -14,7 +14,7 @@ analysis, not a deployed tool or evidence that follow-up prevents readmissions.
 | `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–5, plots, clinical framing, and group handoff |
 | `environment.yml` | Pinned direct dependencies for the first-half scientific environment |
 | `requirements-first-half.lock.txt` | Full package versions from the executed Python 3.10 environment |
-| `Data/` | Downloaded public CSVs; generated locally and ignored by Git |
+| `Data/` | Original UCI encounter CSV and ID mappings, included in the repository |
 | `artifacts/` | Generated tables, figures, split manifest, provenance, and model files; ignored by Git |
 
 ## Install and quickstart
@@ -58,6 +58,17 @@ Source documentation and citation:
 Clore et al. (2014), DOI [10.24432/C5230J](https://doi.org/10.24432/C5230J);
 Strack et al. (2014), [source paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC3996476/).
 The dataset is **CC BY 4.0**; attribute it when sharing derived data or results.
+
+The original, unmodified files are included on `main`:
+`Data/diabetic_data.csv` (101,766 encounter records) and `Data/IDS_mapping.csv`
+(admission/discharge code descriptions). After pulling `main`, the notebook
+uses these local files and verifies their SHA-256 hashes; downloading is only
+needed if the files are absent. Cohort filtering and patient-disjoint splits
+still happen in the notebook. These are not separate training/test datasets;
+keep the final test unevaluated until the full model and policy are locked.
+
+The data license is [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
+No changes have been made to the source CSV contents.
 
 ## Experimental design and measured results
 
