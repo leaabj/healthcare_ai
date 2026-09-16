@@ -1,0 +1,20 @@
+name: healthcare-first-half
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10.20
+  - pip
+  - pip:
+      - numpy==1.26.2
+      - pandas==1.5.3
+      - scipy==1.13.1
+      - scikit-learn==1.5.1
+      - matplotlib==3.9.2
+      - seaborn==0.13.2
+      - joblib==1.4.2
+      - nbformat==5.10.4
+      - nbclient==0.10.2
+      - ipykernel==6.29.5
+      - jupyterlab==4.2.5
+# Tested for Steps 1–5. RAI dependencies remain the Step 9 owner's task;
+# do not interpret this as a validated full Responsible AI environment.
