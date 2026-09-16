@@ -106,9 +106,12 @@ uncertainty or adjust for multiple subgroup comparisons.
 The age-80+ subgroup has lower observed ranking performance (ROC AUC 0.572,
 755 encounters, 81 positives). This warrants later error/calibration review,
 not an unsupported causal explanation or automatic age-based policy.
-Several race and payer groups have very few events; the notebook retains their
-counts, undefined metrics, and caution flags rather than claiming firm fairness
-conclusions.
+Several race and payer groups have very few event-contributing patients; the
+notebook reports encounter counts and distinct positive/negative patient counts.
+A caution flag marks fewer than 20 patients contributing either outcome
+(17 subgroup rows). Patients with both outcomes count in both patient columns.
+These flags are practical warnings, not statistical reliability guarantees;
+undefined metrics remain visible rather than supporting firm fairness conclusions.
 
 ## Remaining work and responsible-AI handoff
 
