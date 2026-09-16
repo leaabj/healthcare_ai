@@ -2,11 +2,6 @@
 
 ## Scope and clinical purpose
 
-Steps **1–5** of the AI for Healthcare rubric are implemented in
-`Diabetes_Readmission_RAI_Skeleton.ipynb`, with saved execution outputs.
-The filename is retained to preserve the group's existing link.
-Steps **6–9** remain commented templates for the rest of the group.
-
 The question is whether discharge-time information can help rank eligible
 patients with recorded diabetes by risk of recorded inpatient readmission
 **in fewer than 30 days after discharge**. This is retrospective educational
@@ -43,17 +38,6 @@ conda activate healthcare-first-half
 python -m ipykernel install --user --name healthcare-first-half --display-name "Healthcare first half (Python 3.10)"
 jupyter lab
 ```
-
-Open the notebook, select **Healthcare first half (Python 3.10)**, and run through
-the **Group handoff** section. The first run downloads the original UCI archive
-if the CSVs are absent and verifies fixed SHA-256 checksums. Later runs use the
-local copies. Steps 6–9 contain commented code and are intentionally not executed.
-
-The Python 3.10 scientific stack aligns with the reference project. The
-`responsibleai`/`raiwidgets` stack is **not installed or verified here**; the
-Step 9 owner must validate it on development data and update the environment.
-The full package lock records the tested environment, but is not a guarantee
-of compatibility on every platform.
 
 ## Data and cohort
 
