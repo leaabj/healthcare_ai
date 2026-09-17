@@ -4,40 +4,55 @@
 
 The question is whether discharge-time information can help rank eligible
 patients with recorded diabetes by risk of recorded inpatient readmission
-**in fewer than 30 days after discharge**. This is retrospective educational
-analysis, not a deployed tool or evidence that follow-up prevents readmissions.
+**in fewer than 30 days after discharge**, so that a discharge team can decide
+whom to contact for follow-up within a fixed contact capacity. This is
+retrospective educational analysis, not a deployed tool and not evidence that
+follow-up prevents readmissions.
 
 ## Files
 
 | File / directory | Purpose |
 |---|---|
-| `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–5, plots, clinical framing, and group handoff |
-| `environment.yml` | Pinned direct dependencies for the first-half scientific environment |
-| `requirements-first-half.lock.txt` | Full package versions from the executed Python 3.10 environment |
+| `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–9: framing, data, splits, pipeline, discrimination, calibration, threshold policy, final test, Responsible AI analysis |
+| `utils.py` | Small helpers used by Steps 6–9: calibration metrics, patient-cluster bootstrap, threshold table and policy choice, subgroup table, error-tree leaves, dashboard model wrappers |
+| `environment.yml` | Pinned direct dependencies, including the Responsible AI toolbox |
+| `requirements.lock.txt` | Full package versions of the executed Python 3.10 environment |
+| `requirements-first-half.lock.txt` | Package versions of the environment that executed Steps 1–5 (kept for provenance) |
 | `Data/` | Original UCI encounter CSV and ID mappings, included in the repository |
-| `artifacts/` | Generated tables, figures, split manifest, provenance, and model files; ignored by Git |
+| `artifacts/` | Generated tables, figures, split manifest, policy lock, model files and saved RAI insights; ignored by Git |
 
 ## Install and quickstart
 
 Run from the repository root. The notebook can be viewed without executing it.
-To reproduce the analysis with the recorded dependency versions:
+The Responsible AI toolbox (`responsibleai`/`raiwidgets` 0.36.0) requires
+numpy ≤ 1.26.2, pandas < 2 and scikit-learn ≤ 1.5.1 on Python 3.10, which is
+why every pin below must stay as it is.
+
+With [uv](https://docs.astral.sh/uv/) (no conda needed):
 
 ```bash
-python3.10 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-first-half.lock.txt
-python -m ipykernel install --prefix .venv --name healthcare-first-half --display-name "Healthcare first half (Python 3.10)"
-jupyter lab
+uv python install 3.10
+uv venv .venv --python 3.10
+uv pip install --python .venv -r requirements.lock.txt
+.venv/bin/python -m ipykernel install --prefix .venv --name healthcare-first-half --display-name "Healthcare first half (Python 3.10)"
+.venv/bin/jupyter lab
 ```
 
-Alternatively, create the direct-dependency Conda environment:
+With conda:
 
 ```bash
 conda env create -f environment.yml
-conda activate healthcare-first-half
+conda activate healthcare-ai
 python -m ipykernel install --user --name healthcare-first-half --display-name "Healthcare first half (Python 3.10)"
 jupyter lab
 ```
+
+Open the notebook, select the kernel, and use **Restart kernel and run all**.
+A full run takes about 12 minutes; most of it is counterfactual generation in
+Step 9. The two `ResponsibleAIDashboard` cells start a local web server and
+render the interactive dashboard inside the notebook. Saved insights in
+`artifacts/rai_insights` can be reloaded with `RAIInsights.load` and passed to
+`ResponsibleAIDashboard` without recomputing.
 
 ## Data and cohort
 
@@ -58,90 +73,117 @@ Source documentation and citation:
 Clore et al. (2014), DOI [10.24432/C5230J](https://doi.org/10.24432/C5230J);
 Strack et al. (2014), [source paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC3996476/).
 The dataset is **CC BY 4.0**; attribute it when sharing derived data or results.
+No changes have been made to the source CSV contents; the notebook verifies
+their SHA-256 hashes.
 
-The original, unmodified files are included on `main`:
-`Data/diabetic_data.csv` (101,766 encounter records) and `Data/IDS_mapping.csv`
-(admission/discharge code descriptions). After pulling `main`, the notebook
-uses these local files and verifies their SHA-256 hashes; downloading is only
-needed if the files are absent. Cohort filtering and patient-disjoint splits
-still happen in the notebook. These are not separate training/test datasets;
-keep the final test unevaluated until the full model and policy are locked.
+## Experimental design
 
-The data license is [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
-No changes have been made to the source CSV contents.
-
-## Experimental design and measured results
-
-Seed **42**, patient-disjoint partitions, no balancing:
+Seed **42**, patient-disjoint partitions, no resampling or class weighting:
 
 | Partition | Encounters | Patients | Use |
 |---|---:|---:|---|
 | Training | 51,253 | 38,249 | Training-only EDA, preprocessing, fitting |
-| Calibration validation | 5,422 | 4,098 | Reserved for calibrator fitting |
-| Policy validation | 5,552 | 4,098 | Discrimination now; thresholds later |
-| Final test | 10,864 | 8,197 | Reserved until full policy lock |
+| Calibration validation | 5,422 | 4,098 | Calibrator fitting only |
+| Policy validation | 5,552 | 4,098 | Discrimination, calibration assessment, threshold selection, RAI exploration |
+| Final test | 10,864 | 8,197 | One evaluation after the policy lock |
 
-Separating calibration and policy validation prevents their fitting/selection
-activities from using identical patients. All six pairwise patient-overlap
-checks pass. No temporal or hospital split is claimed because the public file
-lacks the necessary identifiers. No model tuning follows policy-set results.
+All six pairwise patient-overlap checks pass. No temporal or hospital split is
+possible because the public file lacks the identifiers. The prespecified model
+is an unweighted L2 logistic-regression pipeline over 17 raw predictors (61
+encoded features), fitted on training data only. Uncertainty intervals are
+percentile intervals from 300 patient-cluster bootstrap replicates and
+condition on the fitted model; undefined replicates are dropped and counted.
 
-The unweighted logistic-regression pipeline fits numeric imputation/scaling and
-categorical imputation/encoding on training data only. It uses 17 original
-predictors, generating 61 encoded features, and converged in 27 iterations.
+## Results
 
-**Policy-validation results, not final-test results:**
+**Discrimination (policy validation, Step 5).** AP 0.250 (95% interval
+0.197–0.301) versus a prevalence of 0.111; ROC AUC 0.672 (0.638–0.701). The
+age-80+ subgroup has lower ranking performance (ROC AUC 0.572).
 
-| Model | Average precision | ROC AUC |
-|---|---:|---:|
-| Training-prevalence baseline | 0.111 | 0.500 |
-| Logistic regression | 0.250 | 0.672 |
+**Calibration (Step 6).** Platt scaling fitted on the calibration partition
+with the base model frozen. On policy validation the calibrated model has
+Brier 0.093 (0.086–0.101) against 0.099 for a constant-prevalence prediction,
+equal-count ECE 0.014 (0.009–0.024), mean predicted risk 0.100 against an
+observed rate of 0.111, and unchanged ranking. The highest-risk tenth predicts
+0.25 while 0.30 were readmitted. Calibration changes little because a logistic
+model is already on a probability scale.
 
-Logistic AP 95% interval: **0.197–0.301**; ROC AUC interval:
-**0.638–0.701**, using 300 patient-cluster bootstrap replicates.
-AP is average precision, not trapezoidal PR AUC. Intervals condition on the
-fitted model, exclude single-class replicates, and do not include training
-uncertainty or adjust for multiple subgroup comparisons.
+**Threshold policy (Step 7).** Candidates are every distinct calibrated score
+with the rule *contact if score ≥ threshold*. Two methods plus an illustrative
+harm-weight sensitivity were compared on policy validation; the prespecified
+joint rule (200 contacts per 1,000 and 85% recall) is infeasible, because 85%
+recall needs 726 contacts per 1,000 at precision 0.13. The locked policy is
+therefore the workload policy at the primary budget: threshold **0.1165**,
+with per 1,000 discharges 199 contacts, 45 contacts to patients later
+readmitted, 154 unnecessary contacts, 66 missed readmissions, and about 66
+staff hours at an assumed 20 minutes per contact (recall 0.41, precision 0.23).
+The 40% precision and 85% recall aspirations cannot hold together with this
+model. The lock is written to `artifacts/policy_lock.json` before any test row
+is read.
 
-The age-80+ subgroup has lower observed ranking performance (ROC AUC 0.572,
-755 encounters, 81 positives). This warrants later error/calibration review,
-not an unsupported causal explanation or automatic age-based policy.
-Several race and payer groups have very few event-contributing patients; the
-notebook reports encounter counts and distinct positive/negative patient counts.
-A caution flag marks fewer than 20 patients contributing either outcome
-(17 subgroup rows). Patients with both outcomes count in both patient columns.
-These flags are practical warnings, not statistical reliability guarantees;
-undefined metrics remain visible rather than supporting firm fairness conclusions.
+**Final test (Step 8), evaluated once.** AP 0.180 (0.157–0.204) at a test
+prevalence of 0.095 (1.9× prevalence, against 2.3× on policy validation),
+ROC AUC 0.647 (0.627–0.669), Brier 0.083, ECE 0.007. At the locked threshold:
+182 contacts per 1,000 (within budget), recall 0.36 (0.32–0.40), precision
+0.19 (0.17–0.21), 148 unnecessary contacts and 61 missed readmissions per
+1,000. Recall and precision are below the policy-validation values and outside
+the test intervals: the validation numbers were the best of thousands of
+candidates on one sample, and the lower test prevalence lowers precision. The
+threshold was not changed. Subgroup checks at the locked threshold show
+patients aged 80+ contacted most often (selection rate 0.28, false-positive
+rate 0.26), the highest recall for ages 20–39 (0.51), and 13 subgroup rows
+with too few patients for any disparity claim.
 
-## Remaining work and responsible-AI handoff
+**Responsible AI (Step 9).** `RAIInsights` is built for the locked calibrated
+model wrapped so that `predict` applies the locked threshold, on 10,000
+training and 2,000 policy-validation encounters with training-fitted imputation
+of the 2% missing race values. Findings:
 
-1. **Calibration:** Use `X_cal/y_cal` with the base model frozen. Do not calibrate
-   on policy or test data. Evaluate probability reliability on policy validation.
-2. **Threshold selection:** Compare workload and recall policies on policy
-   validation only. Budgets of 200/250 contacts per 1,000, 85% recall, and 40%
-   precision are classroom aspirations, not achieved operating points.
-3. **Final evaluation:** Lock model, calibration, features, and threshold before
-   producing final-test predictions. Do not retune on test.
-4. **RAI:** Establish compatible input/model representation; check default versus
-   selected threshold semantics; investigate cohorts, fairness, errors,
-   importance, counterfactuals, and causal assumptions.
-5. **Presentation:** Use actual plots and results, clearly separating ranking,
-   calibration, workload, fairness, and causal claims.
+- *Cohorts:* patients with a prior inpatient stay are 32% of encounters, have a
+  16% readmission rate against 10% overall, and 56% of them are contacted; the
+  83% of stays without an HbA1c test have a readmission rate close to average.
+- *Fairness at the locked threshold:* recall ranges from 0.36 to 0.51 across
+  adequately supported groups; unnecessary contacts fall most on patients aged
+  80+; calibration ratios stay near 1 for large groups.
+- *Error analysis:* the highest-error leaf of the dashboard tree, encounters
+  with 2–6 prior inpatient visits, has a contact rate of 0.86 and an error rate
+  of 0.67 made almost entirely of unnecessary contacts: a cohort the model
+  over-flags rather than misses.
+- *Importance:* prior inpatient visits dominate, followed by diagnosis count,
+  insulin, age and HbA1c result, in both the mimic explainer and the exact
+  logistic odds ratios.
+- *Counterfactuals:* DiCE flips classes at 0.50, not at the locked threshold,
+  so the dashboard view does not describe the policy (actionable
+  counterfactuals for 0.6% of encounters). Recomputed against the policy
+  boundary, changing only testing and treatment fields flips 36% of
+  encounters, so the contact decision is sensitive to how in-hospital care is
+  documented; the changes reflect model weights, not recourse a clinician could
+  offer.
+- *Causal:* a recorded HbA1c result above 8 is associated with 0.034 (95%
+  interval 0.014–0.055) lower readmission probability than no test under an
+  explicit pre-treatment adjustment set, and 0.031 when the dashboard also
+  adjusts for in-hospital treatment variables; exploratory and
+  assumption-dependent. Whether follow-up contacts prevent readmission is not
+  estimable from these data.
+- *Risks and monitoring (9.7):* unequal contact burden on patients aged 80+,
+  over-flagging of frequently hospitalised patients, and sensitivity to
+  documentation and drift, each with a mitigation, a monitoring measure and a
+  trigger; plus a clinician-ready conclusion.
 
-The notebook creates `artifacts/handoff.json`, `split_manifest.csv`,
-`uncalibrated_logistic.joblib`, and `prevalence_baseline.joblib`.
-Rerun the first half to regenerate dataframes and matrices; do not guess
-preprocessing when loading a model. Load joblib files only from trusted sources
-in the same compatible environment.
+## Reproducibility, governance and license
 
-No calibration, threshold optimization, final-test metrics, or RAI dashboard
-results are supplied by this first half. Patient identifiers never enter the
-predictive feature matrix. Removing protected attributes alone does not establish
-fairness; counterfactual changes and feature associations do not establish
-treatment effects.
+Seed 42 throughout; the split manifest, policy lock, environment versions,
+data provenance and hashes are saved to `artifacts/`. Patient identifiers never
+enter the feature matrix. Calibration uses the calibration partition only,
+threshold selection uses policy validation only, and the test partition is read
+once after the lock; the gate in Step 8 checks internal consistency, and the
+no-peeking guarantee is procedural (one run from a fresh kernel). Removing
+protected attributes alone does not establish fairness; feature importance,
+counterfactuals and the causal estimates describe model behaviour and
+associations, not treatment effects. Data license: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## Reference workflow
 
 [IE-ML-for-Healthcare/RAI_opioid_risk_prevention](https://github.com/IE-ML-for-Healthcare/RAI_opioid_risk_prevention)
-and the course Session 5–6 rubric, pages 6–8. The reference's synthetic OUD
-findings do not transfer to these hospital records.
+and the course Session 5–6 rubric. The reference's synthetic OUD findings do
+not transfer to these hospital records.

@@ -1,10 +1,11 @@
-name: healthcare-first-half
+name: healthcare-ai
 channels:
   - conda-forge
 dependencies:
   - python=3.10.20
   - pip
   - pip:
+      # Scientific stack executed for Steps 1-5 (unchanged)
       - numpy==1.26.2
       - pandas==1.5.3
       - scipy==1.13.1
@@ -16,5 +17,13 @@ dependencies:
       - nbclient==0.10.2
       - ipykernel==6.29.5
       - jupyterlab==4.2.5
-# Tested for Steps 1–5. RAI dependencies remain the Step 9 owner's task;
-# do not interpret this as a validated full Responsible AI environment.
+      - ipywidgets==8.1.9
+      # Responsible AI toolbox for Step 9. responsibleai/raiwidgets 0.36.0 require numpy<=1.26.2,
+      # pandas<2 and scikit-learn<=1.5.1, which is why the pins above must not be raised.
+      - responsibleai==0.36.0
+      - raiwidgets==0.36.0
+      - interpret-community==0.32.0
+      - erroranalysis==0.5.5
+      - dice-ml==0.11
+      - econml==0.15.1
+      - fairlearn==0.7.0
