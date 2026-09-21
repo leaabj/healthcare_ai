@@ -1,0 +1,11 @@
+discharge_reference,time_in_hospital,num_lab_procedures,num_procedures,num_medications,number_outpatient,number_emergency,number_inpatient,number_diagnoses,age,race,gender,admission_type_id,admission_source_id,A1Cresult,insulin,change,diabetesMed
+SYNTH-001,2,28,0,8,0,0,0,4,[20-30),Caucasian,Female,3,1,None,No,No,Yes
+SYNTH-002,4,43,1,14,1,0,0,6,[40-50),AfricanAmerican,Male,1,7,>7,Steady,Ch,Yes
+SYNTH-003,3,35,0,11,2,0,1,5,[50-60),Hispanic,Female,2,1,Norm,No,No,Yes
+SYNTH-004,7,66,2,22,0,2,2,8,[60-70),Caucasian,Male,1,7,>8,Up,Ch,Yes
+SYNTH-005,5,52,1,18,1,1,2,7,[70-80),AfricanAmerican,Female,1,7,None,Steady,No,Yes
+SYNTH-006,5,52,1,18,1,1,2,7,[70-80),AfricanAmerican,Female,1,7,None,Steady,No,Yes
+SYNTH-007,1,19,0,5,0,0,0,3,[30-40),Asian,Male,3,1,None,No,No,No
+SYNTH-008,9,74,3,27,3,1,4,9,[80-90),Caucasian,Female,1,7,>7,Down,Ch,Yes
+SYNTH-009,4,47,1,13,0,1,0,6,[40-50),?,Female,2,1,Norm,Steady,No,Yes
+SYNTH-010,6,58,2,20,2,0,1,8,[60-70),Other,Male,3,1,>8,Up,Ch,Yes

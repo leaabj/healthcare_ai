@@ -15,8 +15,9 @@ follow-up prevents readmissions.
 |---|---|
 | `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–9: framing, data, splits, pipeline, discrimination, calibration, threshold policy, final test, Responsible AI analysis |
 | `utils.py` | Small helpers used by Steps 6–9: calibration metrics, patient-cluster bootstrap, threshold table and policy choice, subgroup table, error-tree leaves, dashboard model wrappers |
-| `tool.py`, `templates/`, `static/` | Local white, single-page Hospital Follow-up Tool for capacity planning |
+| `tool.py`, `templates/`, `static/` | Compact local tool with planning-calculator and discharge-CSV modes |
 | `requirements-tool.txt` | Tool and notebook-preparation dependencies without the Responsible AI stack |
+| `examples/` | Header-only discharge template and explicitly synthetic demonstration records |
 | `environment.yml` | Pinned direct dependencies, including the Responsible AI toolbox |
 | `requirements.lock.txt` | Full package versions of the executed Python 3.10 environment |
 | `requirements-first-half.lock.txt` | Package versions of the environment that executed Steps 1–5 (kept for provenance) |
@@ -58,10 +59,11 @@ render the interactive dashboard inside the notebook. Saved insights in
 
 ## Hospital Follow-up Tool
 
-A simple local planning interface: enter eligible discharges, contact capacity,
-recall target, and minutes per contact for the same period. It shows the model
-threshold, expected contacts, staff hours, readmissions identified or missed,
-and contacts without a recorded readmission. No patient data entry is needed.
+Use the compact toggle to switch between **Planning calculator** and
+**Discharge CSV**. The planner estimates workload from historical validation
+results. CSV mode counts uploaded records automatically, scores them, and lets
+you view or download a capacity-limited list. A header-only template and clearly
+**synthetic** example are available for the CSV demonstration.
 
 Run with Python 3.10 using the existing project environment, or with `uv`:
 
@@ -73,7 +75,7 @@ uv run --no-project --python 3.10 --with-requirements requirements-tool.txt pyth
 uv run --no-project --python 3.10 --with-requirements requirements-tool.txt python tool.py
 ```
 
-If `artifacts/policy_threshold_table.csv` already exists from the notebook,
+If both `artifacts/calibrated_logistic.joblib` and `artifacts/policy_threshold_table.csv` already exist,
 skip preparation. In the installed project environment, use `python tool.py`
 directly. Use `--port 8001` to choose a different local port.
 
@@ -82,19 +84,81 @@ regenerating its ignored artifacts (including the original policy lock), but
 does not change the saved notebook or evaluate held-out test data. It does not
 require the Responsible AI dashboard packages.
 
-The interface evaluates the calibrated model's exported threshold sweep on
-5,552 policy-validation encounters; it does not retrain on each request.
-Among thresholds satisfying both constraints it selects highest precision,
-breaking ties toward the higher threshold. If infeasible, it explicitly shows
-the maximum recall within capacity and a capacity-limited alternative, plus
-the minimum expected contacts needed for the requested recall.
+### Planning calculator
 
-Counts scale the historical reference cohort to the entered discharge volume.
-They are estimates, not guarantees of hospital workload or readmissions prevented.
-Exploring scenarios does not alter the notebook's locked policy or use the test
-set for threshold selection. This is an educational planning tool, not a
-validated clinical system. The server binds only to localhost; no uploads,
-external services, or patient-level predictions are provided.
+Enter eligible discharge volume, contact capacity, recall target, and minutes per
+contact for the same period. The planner uses the calibrated model's historical
+policy-validation threshold sweep, selecting highest precision subject to the
+capacity and recall constraints. Infeasible requests show the best recall within
+capacity and the minimum projected contacts needed for the requested recall.
+Displayed readmissions identified/missed and precision/recall are historical
+projections—not measurements of an uploaded group or guarantees for a hospital.
+Changing planning inputs does not modify the notebook's locked policy.
+
+### Discharge CSV
+
+The tool scores records with the saved calibrated logistic model; it does not
+retrain on uploads or use the test set. It selects the highest predicted risks
+up to capacity. **This is a new capacity-based demonstration policy, not the
+notebook's locked threshold or a clinically validated recommendation.** If equal
+risks straddle the last available contact, the entire boundary group is marked
+**Review tie** rather than choosing patients arbitrarily. Higher-risk records
+remain selected; remaining slots need manual review. Zero capacity selects none,
+and capacity above the number of records selects all. Staff hours count only
+automatic selections at the entered minutes per contact.
+
+### CSV contract
+
+One row per eligible discharge, not necessarily one per unique person. The file
+must contain `discharge_reference` plus all 17 model predictors; column order may
+vary. Extra columns (including names or readmission outcomes) are rejected.
+
+| Fields | Required representation |
+|---|---|
+| `discharge_reference` | Unique pseudonymous reference, 1–64 ASCII letters/digits/underscore/dot/hyphen; starts with a letter or digit |
+| `time_in_hospital` | Whole days, 1–14 |
+| `num_lab_procedures`, `num_procedures`, `num_medications`, `number_diagnoses` | Nonnegative whole-number counts from the index stay |
+| `number_outpatient`, `number_emergency`, `number_inpatient` | Nonnegative whole-number visits during the preceding year |
+| `age` | Released age band, e.g. `[60-70)`, ages 20+ only |
+| `race`, `gender` | Exact category names used by the trained model |
+| `admission_type_id`, `admission_source_id` | UCI category codes, not arbitrary hospital codes; see `Data/IDS_mapping.csv` |
+| `A1Cresult` | `None` (not measured), `Norm`, `>7`, or `>8` |
+| `insulin` | `No`, `Steady`, `Up`, or `Down` |
+| `change`, `diabetesMed` | `No`/`Ch` and `No`/`Yes`, respectively |
+
+Use UTF-8 CSV (a BOM is accepted), at most 2 MiB and 5,000 records. Numeric counts
+other than stay duration are capped at 10,000 as an input sanity bound, not a
+clinical validity guarantee. Only race may be blank or `?`; it uses the existing
+training-fitted imputation with a warning. Literal `None` in HbA1c is preserved.
+Unknown categories, missing required values, duplicate references, malformed rows,
+and unsafe reference formats are rejected rather than silently repaired.
+
+The uploader must confirm the file is already filtered to diabetes-coded adults
+aged 20+ with eligible home/outpatient discharge codes **1, 6, 7, 8, 16, 17**.
+Age is checked, but diabetes eligibility and discharge destination cannot be
+verified from the 17 predictors alone. A hospital export requires explicit
+mapping to these definitions; uploading an arbitrary export is not sufficient.
+
+### Interpretation and privacy
+
+Results contain a discharge reference, predicted recorded-readmission risk, and
+selection/review status. **Actual recall, precision, readmissions missed, and
+benefit cannot be measured without future outcomes.** The tool does not fabricate
+those metrics, infer that contacting someone prevents readmission, or advise
+changes to medication/testing. Predictions come from historical 1999–2008 data;
+current hospital use requires external validation, subgroup assessment, privacy
+approval, and clinical governance. Standard care must not be withheld based on
+selection status.
+
+Use synthetic or appropriately deidentified records only. Pseudonymous references
+and omission of names do not by themselves establish deidentification. The server
+binds to localhost, accepts CSV text in memory, and does not save uploads or
+results. No third-party services, browser persistent storage, or model uploads
+are used. Scoring responses use `Cache-Control: no-store`; clearing the interface
+removes its displayed results and download link. Downloaded CSVs remain on the
+user's device and are their responsibility. These measures are not a compliance
+certification or secure-erasure guarantee. Do not expose the development server
+on a network. Load only trusted locally generated joblib artifacts.
 
 Focused regression checks: `python -m unittest discover -s tests -v`.
 
