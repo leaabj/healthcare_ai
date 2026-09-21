@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hospital Follow-up Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tool.css') }}">
+    <script src="{{ url_for('static', filename='tool.js') }}" defer></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <p class="eyebrow">Planning tool</p>
+        <h1>Hospital Follow-up Tool</h1>
+        <p class="intro">Explore follow-up contact capacity using the study model. Compare a recall target with the staff time and contacts it may require.</p>
+      </header>
+
+      <div class="workspace">
+        <section class="input-panel" aria-labelledby="inputs-heading">
+          <h2 id="inputs-heading">Your planning inputs</h2>
+          <p class="section-intro">Use totals for the same planning period. No patient information is needed.</p>
+          <form id="plan-form" action="/api/plan" method="post">
+            <div class="field">
+              <label for="discharges">Eligible discharges</label>
+              <input id="discharges" name="discharges" type="number" min="1" max="1000000" step="1" value="1000" required aria-describedby="discharges-help">
+              <p class="field-help" id="discharges-help">Number of discharges to plan for.</p>
+            </div>
+            <div class="field">
+              <label for="capacity">Contact capacity <span class="label-detail">(same period)</span></label>
+              <input id="capacity" name="capacity" type="number" min="0" max="1000" step="1" value="200" required aria-describedby="capacity-help">
+              <p class="field-help" id="capacity-help">Maximum contacts available; cannot exceed eligible discharges.</p>
+            </div>
+            <div class="field">
+              <label for="recall-target">Recall target <span class="label-detail">(%)</span></label>
+              <input id="recall-target" name="recall_target" type="number" min="0" max="100" step="any" value="35" required aria-describedby="recall-help">
+              <p class="field-help" id="recall-help">Share of readmissions you aim to identify for follow-up, not the share prevented.</p>
+            </div>
+            <div class="field">
+              <label for="minutes-per-contact">Minutes per contact</label>
+              <input id="minutes-per-contact" name="minutes_per_contact" type="number" min="1" max="240" step="1" value="20" required>
+            </div>
+            <button id="calculate-button" type="submit">Calculate plan</button>
+            <p class="form-state" id="form-state" role="status" aria-live="polite" aria-atomic="true">Calculating the default plan…</p>
+            <div class="error-message" id="error-message" role="alert" hidden></div>
+          </form>
+          <noscript><p class="error-message">JavaScript is required to calculate a plan. Enable it and reload this page.</p></noscript>
+        </section>
+
+        <section class="result-panel" aria-labelledby="results-heading" id="result-panel" aria-busy="true">
+          <div class="result-heading">
+            <h2 id="results-heading">Planning estimate</h2>
+            <p class="section-intro">Expected counts, not individual patient predictions.</p>
+          </div>
+          <p class="empty-state" id="empty-state">Your estimate will appear here.</p>
+          <div id="results" hidden>
+            <div class="plan-status" id="plan-status">
+              <p class="status-title" id="status-title"></p>
+              <p id="status-detail"></p>
+            </div>
+            <h3 class="plan-label" id="plan-label"></h3>
+            <dl class="primary-metrics">
+              <div class="metric-card">
+                <dt>Expected contacts</dt>
+                <dd id="contacts-value"></dd>
+              </div>
+              <div class="metric-card">
+                <dt>Staff hours</dt>
+                <dd id="hours-value"></dd>
+              </div>
+            </dl>
+            <dl class="secondary-metrics">
+              <div><dt>Readmissions identified</dt><dd id="identified-value"></dd></div>
+              <div><dt>Readmissions missed</dt><dd id="missed-value"></dd></div>
+              <div><dt>Contacts without recorded readmission</dt><dd id="false-positives-value"></dd></div>
+            </dl>
+            <dl class="model-metrics">
+              <div><dt>Recall</dt><dd id="recall-value"></dd></div>
+              <div><dt>Precision</dt><dd id="precision-value"></dd></div>
+              <div><dt>Risk threshold</dt><dd id="threshold-value"></dd></div>
+            </dl>
+            <p class="metric-help">Recall is the share of readmissions identified. Precision is the share of contacts with a recorded readmission. The risk threshold is the model score cutoff for contact.</p>
+            <p class="reference" id="reference"></p>
+          </div>
+          <aside class="caveat" aria-label="Important limitations">
+            <p><strong>For educational capacity planning only.</strong> These are historical policy-validation estimates, not guaranteed capacity or readmissions prevented. Not for clinical use.</p>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

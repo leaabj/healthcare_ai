@@ -15,6 +15,8 @@ follow-up prevents readmissions.
 |---|---|
 | `Diabetes_Readmission_RAI_Skeleton.ipynb` | Executed Steps 1–9: framing, data, splits, pipeline, discrimination, calibration, threshold policy, final test, Responsible AI analysis |
 | `utils.py` | Small helpers used by Steps 6–9: calibration metrics, patient-cluster bootstrap, threshold table and policy choice, subgroup table, error-tree leaves, dashboard model wrappers |
+| `tool.py`, `templates/`, `static/` | Local white, single-page Hospital Follow-up Tool for capacity planning |
+| `requirements-tool.txt` | Tool and notebook-preparation dependencies without the Responsible AI stack |
 | `environment.yml` | Pinned direct dependencies, including the Responsible AI toolbox |
 | `requirements.lock.txt` | Full package versions of the executed Python 3.10 environment |
 | `requirements-first-half.lock.txt` | Package versions of the environment that executed Steps 1–5 (kept for provenance) |
@@ -53,6 +55,48 @@ Step 9. The two `ResponsibleAIDashboard` cells start a local web server and
 render the interactive dashboard inside the notebook. Saved insights in
 `artifacts/rai_insights` can be reloaded with `RAIInsights.load` and passed to
 `ResponsibleAIDashboard` without recomputing.
+
+## Hospital Follow-up Tool
+
+A simple local planning interface: enter eligible discharges, contact capacity,
+recall target, and minutes per contact for the same period. It shows the model
+threshold, expected contacts, staff hours, readmissions identified or missed,
+and contacts without a recorded readmission. No patient data entry is needed.
+
+Run with Python 3.10 using the existing project environment, or with `uv`:
+
+```bash
+# Once on a fresh clone: generate real model results through notebook Section 7.
+uv run --no-project --python 3.10 --with-requirements requirements-tool.txt python tool.py --prepare
+
+# Start the tool; open http://127.0.0.1:8000
+uv run --no-project --python 3.10 --with-requirements requirements-tool.txt python tool.py
+```
+
+If `artifacts/policy_threshold_table.csv` already exists from the notebook,
+skip preparation. In the installed project environment, use `python tool.py`
+directly. Use `--port 8001` to choose a different local port.
+
+Preparation runs the existing notebook through Section 7 in a fresh kernel,
+regenerating its ignored artifacts (including the original policy lock), but
+does not change the saved notebook or evaluate held-out test data. It does not
+require the Responsible AI dashboard packages.
+
+The interface evaluates the calibrated model's exported threshold sweep on
+5,552 policy-validation encounters; it does not retrain on each request.
+Among thresholds satisfying both constraints it selects highest precision,
+breaking ties toward the higher threshold. If infeasible, it explicitly shows
+the maximum recall within capacity and a capacity-limited alternative, plus
+the minimum expected contacts needed for the requested recall.
+
+Counts scale the historical reference cohort to the entered discharge volume.
+They are estimates, not guarantees of hospital workload or readmissions prevented.
+Exploring scenarios does not alter the notebook's locked policy or use the test
+set for threshold selection. This is an educational planning tool, not a
+validated clinical system. The server binds only to localhost; no uploads,
+external services, or patient-level predictions are provided.
+
+Focused regression checks: `python -m unittest discover -s tests -v`.
 
 ## Data and cohort
 

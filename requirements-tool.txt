@@ -1,0 +1,3 @@
+# Reuse the pinned notebook runtime for model preparation; RAI packages are not needed.
+-r requirements-first-half.lock.txt
+flask==3.1.3

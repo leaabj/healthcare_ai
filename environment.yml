@@ -18,6 +18,8 @@ dependencies:
       - ipykernel==6.29.5
       - jupyterlab==4.2.5
       - ipywidgets==8.1.9
+      # Local hospital follow-up planning tool (also present in requirements.lock.txt)
+      - flask==3.1.3
       # Responsible AI toolbox for Step 9. responsibleai/raiwidgets 0.36.0 require numpy<=1.26.2,
       # pandas<2 and scikit-learn<=1.5.1, which is why the pins above must not be raised.
       - responsibleai==0.36.0
