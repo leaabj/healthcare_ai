@@ -103,10 +103,15 @@ age-80+ subgroup has lower ranking performance (ROC AUC 0.572).
 **Calibration (Step 6).** Platt scaling fitted on the calibration partition
 with the base model frozen. On policy validation the calibrated model has
 Brier 0.093 (0.086–0.101) against 0.099 for a constant-prevalence prediction,
-equal-count ECE 0.014 (0.009–0.024), mean predicted risk 0.100 against an
+quantile-bin ECE 0.014 (0.009–0.024), mean predicted risk 0.100 against an
 observed rate of 0.111, and unchanged ranking. The highest-risk tenth predicts
 0.25 while 0.30 were readmitted. Calibration changes little because a logistic
 model is already on a probability scale.
+ECE uses up to ten score-quantile bins, keeping identical predictions together.
+Ties may reduce the number of occupied bins or make their sizes unequal; the
+constant-prevalence baseline has one bin. The `ece_equal_count` columns refer
+to this approximately equal-count strategy. This corrects the earlier
+row-order-dependent tie splitting without changing predictions or policy.
 
 **Threshold policy (Step 7).** Candidates are every distinct calibrated score
 with the rule *contact if score ≥ threshold*. Two methods plus an illustrative

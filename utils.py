@@ -1,8 +1,8 @@
 """Helpers for Sections 6-9 of the readmission notebook.
 
 - positive_proba(estimator, X): positive-class probabilities from a fitted classifier.
-- calibration_metrics(y, p): Brier, log loss, equal-count ECE, mean predicted, observed prevalence.
-- reliability_table(y, p, n_bins): equal-count risk bands with mean predicted and observed rates.
+- calibration_metrics(y, p): Brier, log loss, quantile-bin ECE, mean predicted, observed prevalence.
+- reliability_table(y, p, n_bins): tie-preserving quantile risk bands with mean predicted and observed rates.
 - patient_bootstrap(stat_fn, frame, patient_col, ...): patient-cluster percentile interval for any statistic.
 - calibration_intervals(frame, patient_col, ...): bootstrap intervals for Brier and ECE of a frame with columns y, p.
 - threshold_table(y, p, minutes_per_contact, thresholds=None): confusion counts and per-1,000 impact per threshold.
@@ -24,9 +24,13 @@ def positive_proba(estimator, X):
 
 
 def reliability_table(y, p, n_bins=10):
-    """Equal-count bins (band 1 = lowest predicted risk); observed rate versus mean predicted probability."""
+    """Up to n_bins quantile bands (1 = lowest risk), keeping equal scores together.
+
+    Ties can produce unequal counts or fewer occupied bands; constant scores form one band.
+    """
     frame = pd.DataFrame({"y": np.asarray(y), "p": np.asarray(p)})
-    frame["band"] = pd.qcut(frame["p"].rank(method="first"), n_bins, labels=range(1, n_bins + 1))
+    boundaries = np.unique(np.quantile(frame["p"], np.linspace(0, 1, n_bins + 1)[1:-1]))
+    frame["band"] = np.searchsorted(boundaries, frame["p"], side="left") + 1
     table = frame.groupby("band", observed=True).agg(
         records=("y", "size"), min_predicted=("p", "min"), max_predicted=("p", "max"),
         mean_predicted=("p", "mean"), observed_rate=("y", "mean"))
@@ -35,7 +39,11 @@ def reliability_table(y, p, n_bins=10):
 
 
 def calibration_metrics(y, p, n_bins=10):
-    """ECE is the record-weighted mean |predicted - observed| over equal-count bins (quantile binning, not equal-width)."""
+    """Record-weighted calibration gap in tie-preserving quantile bins.
+
+    The ece_equal_count field uses approximately equal-count bins, not equal-width bins;
+    exact equal counts are not guaranteed when scores tie.
+    """
     table = reliability_table(y, p, n_bins)
     return {
         "brier": brier_score_loss(y, p),
@@ -64,7 +72,7 @@ def patient_bootstrap(stat_fn, frame, patient_col, n_bootstrap=300, seed=42):
 
 
 def calibration_intervals(frame, patient_col, n_bootstrap=300, seed=42):
-    """Patient-cluster 95% intervals for the Brier score and equal-count ECE of a frame with columns y and p."""
+    """Patient-cluster 95% intervals for Brier and quantile-bin ECE of a frame with columns y and p."""
     statistics = {"brier": lambda f: brier_score_loss(f["y"], f["p"]),
                   "ece_equal_count": lambda f: calibration_metrics(f["y"], f["p"])["ece_equal_count"]}
     out = {}

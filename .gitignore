@@ -7,3 +7,4 @@ Data/*
 !Data/diabetic_data.csv
 !Data/IDS_mapping.csv
 artifacts/
+/LOCAL_REVIEW_FINDINGS.md
