@@ -21,6 +21,7 @@ follow-up prevents readmissions.
 | `environment.yml` | Pinned direct dependencies, including the Responsible AI toolbox |
 | `requirements.lock.txt` | Full package versions of the executed Python 3.10 environment |
 | `requirements-first-half.lock.txt` | Package versions of the environment that executed Steps 1–5 (kept for provenance) |
+| `presentation/` | Responsible AI slides (`RAI_dashboard_slides.pptx`) with the dashboard screenshots they use |
 | `Data/` | Original UCI encounter CSV and ID mappings, included in the repository |
 | `artifacts/` | Generated tables, figures, split manifest, policy lock, model files and saved RAI insights; ignored by Git |
 
