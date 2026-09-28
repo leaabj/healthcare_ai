@@ -8,3 +8,4 @@ Data/*
 !Data/IDS_mapping.csv
 artifacts/
 /LOCAL_REVIEW_FINDINGS.md
+/LOCAL_TOOL_SCOPE.md
