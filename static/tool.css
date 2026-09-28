@@ -73,11 +73,10 @@ tbody tr:last-child > * { border-bottom: 0; }
 .selected-row { background: #f4f7f4; }
 .selected-row td:last-child { font-weight: 600; }
 .review-row { background: #faf8f3; }
-.plan-status { padding: 10px 12px; border-left: 3px solid #5b705f; background: #f6f8f6; }
+.plan-status { margin-bottom: 16px; padding: 10px 12px; border-left: 3px solid #5b705f; background: #f6f8f6; }
 .plan-status.is-infeasible { border-left-color: #967446; background: #faf8f3; }
 .plan-status p { margin: 6px 0 0; font-size: 0.875rem; }
 .plan-status .status-title { margin-top: 0; font-weight: 650; font-size: 0.9375rem; }
-.plan-label { font-size: 0.8125rem; font-weight: 600; margin: 16px 0 8px; }
 .secondary-metrics { margin-top: 12px; }
 .secondary-metrics > div { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid #ededed; font-size: 0.875rem; }
 .secondary-metrics dt { color: #555; }
@@ -88,6 +87,24 @@ tbody tr:last-child > * { border-bottom: 0; }
 .reference { margin: 14px 0 0; font-size: 0.75rem; color: #666; }
 .caveat { margin-top: 16px; padding-top: 12px; border-top: 1px solid #dedede; color: #626262; font-size: 0.75rem; }
 .caveat p { margin: 0; }
+.tradeoff-chart { margin: 22px 0 0; border-top: 1px solid #dedede; padding-top: 16px; }
+.tradeoff-chart h3 { margin: 0 0 10px; font-size: 0.9375rem; font-weight: 600; }
+.chart-scroll { overflow-x: auto; }
+#planner-chart { display: block; width: 100%; min-width: 480px; }
+#planner-chart text { fill: #555; font-size: 13px; }
+.chart-grid { stroke: #ededed; stroke-width: 1; }
+.chart-axis { stroke: #767676; stroke-width: 1; }
+.chart-over-capacity { fill: #f5f5f5; }
+.chart-curve { fill: none; stroke: #365e9b; stroke-width: 2.5; stroke-linejoin: round; }
+.chart-capacity { stroke: #967446; stroke-width: 2; stroke-dasharray: 7 4; }
+.chart-target { stroke: #5b705f; stroke-width: 2; stroke-dasharray: 2 4; }
+.chart-selected { fill: #202020; stroke: #fff; stroke-width: 2; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0; margin: 8px 0; list-style: none; font-size: 0.75rem; }
+.chart-legend li { display: flex; align-items: center; gap: 6px; }
+.chart-key { display: inline-block; width: 20px; border-top: 3px solid #365e9b; }
+.capacity-key { border-color: #967446; border-top-style: dashed; }
+.target-key { border-color: #5b705f; border-top-style: dotted; }
+.selected-key { width: 9px; height: 9px; border: 0; border-radius: 50%; background: #202020; }
 
 @media (max-width: 800px) {
   .page { padding: 20px; }

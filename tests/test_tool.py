@@ -46,6 +46,56 @@ class HospitalPlanningTests(unittest.TestCase):
         self.assertIsNone(result["plan"]["threshold"])
         self.assertIsNone(result["plan"]["precision"])
 
+    def test_longer_contacts_make_recall_infeasible_with_fixed_staff_hours(self):
+        inputs = {
+            "discharges": 4, "capacity": 4, "recall_target": 100,
+            "minutes_per_contact": 20, "available_staff_hours": 1,
+        }
+        shorter = self.client.post("/api/plan", json=inputs).get_json()
+        longer = self.client.post("/api/plan", json={**inputs, "minutes_per_contact": 30}).get_json()
+        self.assertTrue(shorter["feasible"])
+        self.assertEqual(shorter["plan"]["contacts"], 3)
+        self.assertEqual(shorter["plan"]["recall"], 1)
+        self.assertFalse(longer["feasible"])
+        self.assertEqual(longer["effective_capacity"], 2)
+        self.assertEqual(longer["limiting_constraint"], "staff_hours")
+        self.assertEqual(longer["plan"]["contacts"], 2)
+        self.assertEqual(longer["plan"]["recall"], 0.5)
+        self.assertLessEqual(longer["plan"]["staff_hours"], 1)
+
+    def test_fractional_hours_preserve_whole_contact_boundary_and_contact_limit(self):
+        inputs = {
+            "discharges": 4, "capacity": 4, "recall_target": 100,
+            "minutes_per_contact": 82, "available_staff_hours": 4.1,
+        }
+        # 4.1 hours is exactly 246 minutes: enough for three 82-minute contacts.
+        exact = self.client.post("/api/plan", json=inputs).get_json()
+        self.assertTrue(exact["feasible"])
+        self.assertEqual(exact["plan"]["contacts"], 3)
+        below = self.client.post("/api/plan", json={**inputs, "available_staff_hours": 4.099}).get_json()
+        self.assertFalse(below["feasible"])
+        self.assertEqual(below["plan"]["contacts"], 2)
+        capped = self.client.post("/api/plan", json={**inputs, "capacity": 2}).get_json()
+        self.assertFalse(capped["feasible"])
+        self.assertEqual(capped["plan"]["contacts"], 2)
+        self.assertEqual(capped["limiting_constraint"], "contacts")
+
+    def test_zero_staff_hours_is_not_an_absent_limit(self):
+        inputs = {
+            "discharges": 4, "capacity": 4, "recall_target": 100, "minutes_per_contact": 20,
+        }
+        for optional in ({}, {"available_staff_hours": None}):
+            with self.subTest(optional=optional):
+                unlimited = self.client.post("/api/plan", json={**inputs, **optional}).get_json()
+                self.assertTrue(unlimited["feasible"])
+                self.assertEqual(unlimited["plan"]["contacts"], 3)
+        zero = self.client.post("/api/plan", json={**inputs, "available_staff_hours": 0}).get_json()
+        self.assertFalse(zero["feasible"])
+        self.assertEqual(zero["effective_capacity"], 0)
+        self.assertEqual(zero["plan"]["contacts"], 0)
+        self.assertEqual(zero["plan"]["staff_hours"], 0)
+        self.assertEqual(zero["plan"]["missed"], 2)
+
 
 class DischargeSelectionTests(unittest.TestCase):
     def test_boundary_tie_is_entirely_reviewed_not_lexically_selected(self):

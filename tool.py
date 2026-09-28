@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+from decimal import Decimal
 import io
 import math
 from pathlib import Path
@@ -116,9 +117,10 @@ def load_policy_table(artifact_dir):
 
 def normalize_inputs(payload):
     if not isinstance(payload, dict):
-        raise ValueError("Send a JSON object containing the four planning inputs.")
-    if set(payload) != set(DEFAULTS):
-        raise ValueError("Provide only discharges, capacity, recall_target, and minutes_per_contact. All four are required.")
+        raise ValueError("Send a JSON object containing the planning inputs.")
+    required = set(DEFAULTS)
+    if not required.issubset(payload) or set(payload) - required - {"available_staff_hours"}:
+        raise ValueError("Provide discharges, capacity, recall_target, and minutes_per_contact, plus optional available_staff_hours.")
     for name, low, high in [
         ("discharges", 1, 1_000_000),
         ("capacity", 0, 1_000_000),
@@ -132,12 +134,26 @@ def normalize_inputs(payload):
     recall = payload["recall_target"]
     if type(recall) not in (int, float) or not 0 <= recall <= 100 or not math.isfinite(recall):
         raise ValueError("recall_target must be a finite number from 0 to 100 percent.")
-    return {**payload, "recall_target": float(recall)}
+    hours = payload.get("available_staff_hours")
+    if hours is not None and (
+        type(hours) not in (int, float) or not 0 <= hours <= 4_000_000 or not math.isfinite(hours)
+    ):
+        raise ValueError("available_staff_hours must be null or a finite number from 0 to 4,000,000.")
+    return {**payload, "recall_target": float(recall), "available_staff_hours": hours}
 
 
 def calculate_plan(table, encounters, prevalence, inputs):
     discharges = inputs["discharges"]
-    budget = inputs["capacity"] * 1000 / discharges
+    effective_capacity = inputs["capacity"]
+    limiting_constraint = "contacts"
+    hours = inputs["available_staff_hours"]
+    if hours is not None:
+        # Decimal arithmetic preserves exact whole-contact boundaries such as 4.1 hours.
+        time_capacity = int(Decimal(str(hours)) * 60 // inputs["minutes_per_contact"])
+        if time_capacity <= effective_capacity:
+            limiting_constraint = "both" if time_capacity == effective_capacity else "staff_hours"
+            effective_capacity = time_capacity
+    budget = effective_capacity * 1000 / discharges
     recall_floor = inputs["recall_target"] / 100
     best_recall = pick_policy(table, "recall", budget)
     selected = pick_policy(table, "precision", budget, recall_floor)
@@ -152,8 +168,14 @@ def calculate_plan(table, encounters, prevalence, inputs):
         minimum_contacts = float((meeting_target["tp"] + meeting_target["fp"]).min() * scale)
     threshold = float(selected["threshold"])
     precision = float(selected["precision"])
+    tradeoff = pd.DataFrame({
+        "contacts": (table["tp"] + table["fp"]) * scale,
+        "recall": table["recall"],
+    }).drop_duplicates().sort_values("contacts")
     return {
         "feasible": feasible,
+        "effective_capacity": effective_capacity,
+        "limiting_constraint": limiting_constraint,
         "plan": {
             "threshold": threshold if math.isfinite(threshold) else None,
             "contacts": contacts,
@@ -166,6 +188,7 @@ def calculate_plan(table, encounters, prevalence, inputs):
         },
         "maximum_recall": float(best_recall["recall"]),
         "minimum_contacts_for_target": minimum_contacts,
+        "tradeoff": tradeoff.to_numpy().tolist(),
         "reference": {"encounters": encounters, "prevalence": prevalence, "source": "Policy validation"},
         "constraints": inputs,
     }

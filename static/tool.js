@@ -40,8 +40,9 @@
     const planEmpty = document.getElementById("planner-empty-state");
     const discharges = planForm.elements.namedItem("discharges");
     const planCapacity = planForm.elements.namedItem("capacity");
+    const staffHours = planForm.elements.namedItem("available_staff_hours");
     const planNumberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
-    const planPercentFormat = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
+    const planPercentFormat = new Intl.NumberFormat(undefined, { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 });
     let version = 0;
     let request = null;
 
@@ -65,42 +66,104 @@
       if (request) request.abort();
       request = null;
       validateCapacity();
-      clearPlan("Calculate a plan to see an up-to-date historical estimate.");
+      clearPlan("Inputs changed. Calculate again.");
       planPanel.setAttribute("aria-busy", "false");
       planButton.disabled = false;
       planButton.textContent = "Calculate plan";
-      planState.textContent = "Calculate again to update the historical estimate.";
+      planState.textContent = "Inputs changed.";
     }
 
     function validPlan(data) {
       if (!data || typeof data.feasible !== "boolean" || !data.plan || !data.reference) return false;
+      if (!data.constraints || !Number.isFinite(data.constraints.discharges) || data.constraints.discharges < 1
+        || !Number.isFinite(data.constraints.recall_target) || data.constraints.recall_target < 0
+        || data.constraints.recall_target > 100 || !Array.isArray(data.tradeoff) || data.tradeoff.length < 2
+        || !data.tradeoff.every((point, index) => Array.isArray(point) && point.length === 2
+          && Number.isFinite(point[0]) && point[0] >= 0 && point[0] <= data.constraints.discharges
+          && Number.isFinite(point[1]) && point[1] >= 0 && point[1] <= 1
+          && (index === 0 || (point[0] >= data.tradeoff[index - 1][0] && point[1] >= data.tradeoff[index - 1][1])))) return false;
       const plan = data.plan;
       return ["contacts", "true_positives", "false_positives", "missed", "recall", "staff_hours"]
         .every((key) => Number.isFinite(plan[key]))
         && (plan.threshold === null || Number.isFinite(plan.threshold))
         && (plan.precision === null || Number.isFinite(plan.precision))
         && Number.isFinite(data.maximum_recall)
+        && Number.isInteger(data.effective_capacity) && data.effective_capacity >= 0
+        && ["contacts", "staff_hours", "both"].includes(data.limiting_constraint)
         && (data.minimum_contacts_for_target === null || Number.isFinite(data.minimum_contacts_for_target))
         && Number.isInteger(data.reference.encounters)
         && Number.isFinite(data.reference.prevalence)
         && data.reference.source === "Policy validation";
     }
 
+    function renderTradeoff(data) {
+      const chart = document.getElementById("planner-chart");
+      const fragment = document.createDocumentFragment();
+      const left = 64, right = 610, top = 30, bottom = 292;
+      const volume = data.constraints.discharges;
+      const x = (contacts) => left + contacts / volume * (right - left);
+      const y = (recall) => bottom - recall * (bottom - top);
+      function add(tag, attributes, text) {
+        const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+        for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+        if (text !== undefined) node.textContent = text;
+        fragment.append(node);
+        return node;
+      }
+      add("rect", {
+        x: x(data.effective_capacity), y: top, width: right - x(data.effective_capacity),
+        height: bottom - top, class: "chart-over-capacity"
+      });
+      for (let tick = 0; tick <= 4; tick += 1) {
+        const fraction = tick / 4;
+        add("line", { x1: left, y1: y(fraction), x2: right, y2: y(fraction), class: "chart-grid" });
+        add("text", { x: left - 10, y: y(fraction) + 4, "text-anchor": "end" }, `${tick * 25}%`);
+        add("line", { x1: x(volume * fraction), y1: bottom, x2: x(volume * fraction), y2: bottom + 5, class: "chart-axis" });
+        add("text", { x: x(volume * fraction), y: bottom + 22, "text-anchor": "middle" },
+          planNumberFormat.format(volume * fraction));
+      }
+      add("text", { x: left, y: 16 }, "Recall");
+      add("text", { x: (left + right) / 2, y: 340, "text-anchor": "middle" }, "Expected contacts");
+      add("line", { x1: left, y1: top, x2: left, y2: bottom, class: "chart-axis" });
+      add("line", { x1: left, y1: bottom, x2: right, y2: bottom, class: "chart-axis" });
+      add("polyline", {
+        points: data.tradeoff.map(([contacts, recall]) => `${x(contacts)},${y(recall)}`).join(" "),
+        class: "chart-curve"
+      });
+      add("line", {
+        x1: x(data.effective_capacity), y1: top, x2: x(data.effective_capacity), y2: bottom,
+        class: "chart-capacity"
+      });
+      const target = data.constraints.recall_target / 100;
+      add("line", { x1: left, y1: y(target), x2: right, y2: y(target), class: "chart-target" });
+      const point = add("circle", { cx: x(data.plan.contacts), cy: y(data.plan.recall), r: 6, class: "chart-selected" });
+      const pointTitle = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      pointTitle.textContent = `Selected plan: ${planNumberFormat.format(data.plan.contacts)} contacts, ${planPercentFormat.format(data.plan.recall)} recall`;
+      point.append(pointTitle);
+      chart.replaceChildren(fragment);
+      setText("planner-chart-description",
+        `Capacity: ${integerFormat.format(data.effective_capacity)} contacts. Recall target: ${planPercentFormat.format(target)}. `
+        + `${pointTitle.textContent}. Maximum recall within capacity: ${planPercentFormat.format(data.maximum_recall)}. `
+        + (data.feasible ? "The selected plan meets the target." : "The recall target cannot be reached within capacity."));
+    }
+
     function renderPlan(data) {
       const plan = data.plan;
-      const title = data.feasible ? "Target achievable" : "Target not achievable";
+      const title = data.feasible ? "Recall target met" : "Recall target out of reach";
       document.getElementById("planner-plan-status").classList.toggle("is-infeasible", !data.feasible);
       setText("planner-status-title", title);
-      if (data.feasible) {
-        setText("planner-status-detail", "Highest precision within your capacity and recall target in the historical reference data.");
-        setText("planner-plan-label", "Plan meeting your inputs");
-      } else {
-        const detail = data.minimum_contacts_for_target === null
-          ? "No historical threshold meets this target."
-          : `Target needs approximately ${planNumberFormat.format(data.minimum_contacts_for_target)} contacts.`;
-        setText("planner-status-detail", `Historical maximum recall within capacity: ${planPercentFormat.format(data.maximum_recall)}. ${detail}`);
-        setText("planner-plan-label", "Capacity-limited alternative · not a recommendation");
+      const limits = {
+        contacts: "contact limit",
+        staff_hours: "staff-hours limit",
+        both: "both limits"
+      };
+      let detail = `Capacity: ${integerFormat.format(data.effective_capacity)} contacts (${limits[data.limiting_constraint]}).`;
+      if (!data.feasible) {
+        detail += data.minimum_contacts_for_target === null
+          ? " No historical threshold meets the target."
+          : ` Target needs ~${planNumberFormat.format(data.minimum_contacts_for_target)} contacts.`;
       }
+      setText("planner-status-detail", detail);
       setText("planner-contacts-value", planNumberFormat.format(plan.contacts));
       setText("planner-hours-value", planNumberFormat.format(plan.staff_hours));
       setText("planner-identified-value", planNumberFormat.format(plan.true_positives));
@@ -108,11 +171,12 @@
       setText("planner-false-positives-value", planNumberFormat.format(plan.false_positives));
       setText("planner-recall-value", planPercentFormat.format(plan.recall));
       setText("planner-precision-value", plan.precision === null ? "Not applicable" : planPercentFormat.format(plan.precision));
-      setText("planner-threshold-value", plan.threshold === null ? "No contacts" : percentFormat.format(plan.threshold));
-      setText("planner-reference", `${data.reference.source} · ${integerFormat.format(data.reference.encounters)} historical encounters · ${planPercentFormat.format(data.reference.prevalence)} readmission rate. Counts projected to eligible discharges; rounded for display.`);
+      setText("planner-threshold-value", plan.threshold === null ? "No contacts" : planPercentFormat.format(plan.threshold));
+      setText("planner-reference", `${data.reference.source} · ${integerFormat.format(data.reference.encounters)} encounters · ${planPercentFormat.format(data.reference.prevalence)} readmitted`);
+      renderTradeoff(data);
       planEmpty.hidden = true;
       planResults.hidden = false;
-      planState.textContent = `${title} in historical reference data. ${planNumberFormat.format(plan.contacts)} expected contacts and ${planNumberFormat.format(plan.staff_hours)} staff hours.`;
+      planState.textContent = `${title}. Results updated.`;
     }
 
     async function calculatePlan() {
@@ -125,7 +189,8 @@
         discharges: discharges.valueAsNumber,
         capacity: planCapacity.valueAsNumber,
         recall_target: planForm.elements.namedItem("recall_target").valueAsNumber,
-        minutes_per_contact: planForm.elements.namedItem("minutes_per_contact").valueAsNumber
+        minutes_per_contact: planForm.elements.namedItem("minutes_per_contact").valueAsNumber,
+        available_staff_hours: staffHours.value === "" ? null : staffHours.valueAsNumber
       };
       clearPlan("Calculating your historical planning estimate…");
       planPanel.setAttribute("aria-busy", "true");

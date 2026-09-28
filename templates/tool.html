@@ -16,13 +16,14 @@
       <div class="workspace" id="planner-workspace">
         <section class="input-panel" aria-labelledby="planner-inputs-heading">
           <h2 id="planner-inputs-heading">Inputs</h2>
+          <p class="field-help">Use totals for the same period.</p>
           <form id="plan-form" action="/api/plan" method="post">
             <div class="field">
               <label for="planner-discharges">Eligible discharges</label>
               <input id="planner-discharges" name="discharges" type="number" min="1" max="1000000" step="1" value="1000" required>
             </div>
             <div class="field">
-              <label for="planner-capacity">Contact capacity <span class="label-detail">(same period)</span></label>
+              <label for="planner-capacity">Maximum contacts</label>
               <input id="planner-capacity" name="capacity" type="number" min="0" max="1000000" step="1" value="200" required>
             </div>
             <div class="field">
@@ -30,8 +31,13 @@
               <input id="planner-recall-target" name="recall_target" type="number" min="0" max="100" step="any" value="35" required>
             </div>
             <div class="field">
-              <label for="planner-minutes-per-contact">Minutes per contact</label>
+              <label for="planner-minutes-per-contact" title="Include call and documentation time.">Minutes per contact</label>
               <input id="planner-minutes-per-contact" name="minutes_per_contact" type="number" min="1" max="240" step="1" value="20" required>
+            </div>
+            <div class="field">
+              <label for="planner-staff-hours">Staff hours <span class="label-detail">(optional)</span></label>
+              <input id="planner-staff-hours" name="available_staff_hours" type="number" min="0" max="4000000" step="any" placeholder="Unlimited" aria-describedby="planner-staff-hours-help">
+              <p class="field-help" id="planner-staff-hours-help">Blank = unlimited; 0 = no contacts.</p>
             </div>
             <button id="planner-calculate-button" type="submit">Calculate plan</button>
             <p class="sr-only" id="planner-form-state" role="status" aria-live="polite" aria-atomic="true">Calculating the default plan…</p>
@@ -40,17 +46,16 @@
           <noscript><p class="error-message">JavaScript is required to use both tools. Enable it and reload this page.</p></noscript>
         </section>
         <section class="result-panel" aria-labelledby="planner-results-heading" id="planner-result-panel" aria-busy="true">
-          <div class="result-heading"><h2 id="planner-results-heading">Historical estimate</h2></div>
+          <div class="result-heading"><h2 id="planner-results-heading">Historical projections</h2></div>
           <p class="empty-state" id="planner-empty-state">Your estimate will appear here.</p>
           <div id="planner-results" hidden>
             <div class="plan-status" id="planner-plan-status">
               <p class="status-title" id="planner-status-title"></p>
               <p id="planner-status-detail"></p>
             </div>
-            <h3 class="plan-label" id="planner-plan-label"></h3>
             <dl class="primary-metrics planner-metrics">
               <div class="metric-card"><dt>Expected contacts</dt><dd id="planner-contacts-value"></dd></div>
-              <div class="metric-card"><dt>Staff hours</dt><dd id="planner-hours-value"></dd></div>
+              <div class="metric-card"><dt>Staff hours required</dt><dd id="planner-hours-value"></dd></div>
             </dl>
             <dl class="secondary-metrics">
               <div><dt>Readmissions identified</dt><dd id="planner-identified-value"></dd></div>
@@ -63,9 +68,24 @@
               <div><dt>Risk threshold</dt><dd id="planner-threshold-value"></dd></div>
             </dl>
             <p class="reference" id="planner-reference"></p>
+            <figure class="tradeoff-chart" aria-labelledby="planner-chart-heading">
+              <h3 id="planner-chart-heading">Recall vs. workload</h3>
+              <div class="chart-scroll" role="region" aria-label="Recall–workload chart; scroll horizontally on small screens" tabindex="0">
+                <svg id="planner-chart" viewBox="0 0 640 350" role="img" aria-labelledby="planner-chart-heading planner-chart-description"></svg>
+              </div>
+              <ul class="chart-legend" aria-label="Chart legend">
+                <li><span class="chart-key curve-key" aria-hidden="true"></span>Thresholds</li>
+                <li><span class="chart-key capacity-key" aria-hidden="true"></span>Capacity</li>
+                <li><span class="chart-key target-key" aria-hidden="true"></span>Recall target</li>
+                <li><span class="chart-key selected-key" aria-hidden="true"></span>Plan</li>
+              </ul>
+              <figcaption class="sr-only">
+                <p id="planner-chart-description"></p>
+              </figcaption>
+            </figure>
           </div>
           <aside class="caveat" aria-label="Planning limitations">
-            <p>Historical estimates only · Not clinically validated. Projected outcomes are not evidence of benefit or predictions for an uploaded discharge list.</p>
+            <p>Historical estimates only—not clinically validated or evidence of benefit. Actual outcomes and workload may differ.</p>
           </aside>
         </section>
       </div>

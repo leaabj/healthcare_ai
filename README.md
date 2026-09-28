@@ -86,14 +86,43 @@ require the Responsible AI dashboard packages.
 
 ### Planning calculator
 
-Enter eligible discharge volume, contact capacity, recall target, and minutes per
-contact for the same period. The planner uses the calibrated model's historical
+Enter eligible discharge volume, maximum contacts, recall target, and estimated
+minutes per contact for the same period. Optionally enter available staff hours
+for that period; leave blank for no staffing limit, or enter zero to allow no
+contacts. Fractional hours are accepted. Effective capacity is the smaller of
+maximum contacts and `floor(available staff hours × 60 / minutes per contact)`.
+For example, 200 maximum contacts and 50 staff hours allow 150 contacts at
+20 minutes each, or 100 at 30 minutes each. The result identifies which limit
+applies. Duration includes calls and documentation; it is an average workload
+assumption, not a staff-scheduling guarantee. Without a staff-hours limit,
+duration changes estimated hours required but not threshold selection.
+
+The planner uses the calibrated model's historical
 policy-validation threshold sweep, selecting highest precision subject to the
 capacity and recall constraints. Infeasible requests show the best recall within
 capacity and the minimum projected contacts needed for the requested recall.
 Displayed readmissions identified/missed and precision/recall are historical
 projections—not measurements of an uploaded group or guarantees for a hospital.
 Changing planning inputs does not modify the notebook's locked policy.
+Planner percentages display two decimal places; feasibility uses unrounded
+values, so a displayed percentage should not be treated as an exact boundary.
+
+The **Recall vs. workload** chart plots expected contacts against
+recall for the evaluated policy-validation thresholds, scaled to the entered
+discharge volume. It marks effective capacity, the recall target, and the selected
+plan, with shading beyond capacity and a screen-reader summary. Contact duration moves the
+capacity line when staffing is the limiting constraint. Changing any input hides
+the previous chart until recalculation. The line connects actual threshold
+candidates; intermediate contact counts are not necessarily attainable, and the
+curve is not a future-performance guarantee. On small screens the chart scrolls
+horizontally.
+
+The planning API accepts optional `available_staff_hours` as a finite JSON number
+from 0 to 4,000,000; omission or `null` means no staff-hours constraint.
+Responses include `effective_capacity`, `limiting_constraint` (`contacts`,
+`staff_hours`, or `both`), and `tradeoff`: distinct `[expected_contacts, recall]`
+pairs sorted by contacts, with recall expressed as a fraction. The CSV feature's
+inputs and selection policy are unchanged.
 
 ### Discharge CSV
 
